@@ -49,6 +49,11 @@ class CartProvider with ChangeNotifier {
     _items.clear();
     notifyListeners();
   }
+  
+  void clearByEmpresa(int empresaId) {
+    _items.removeWhere((_, cartItem) => cartItem.product.empresaId == empresaId);
+    notifyListeners();
+  }
 
   List<CartItem> getItemsByEmpresa(int empresaId) {
     return _items.values

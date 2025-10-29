@@ -10,7 +10,7 @@ import '../models/order_status.dart';
 
 class ApiService {
   // URL base SIN barra final
-  static const String baseUrl = 'http://localhost:5054';
+  static const String baseUrl = 'https://app-251028002251.azurewebsites.net';
 
   String? _token;
 
@@ -19,9 +19,7 @@ class ApiService {
   }
 
   Map<String, String> _getHeaders({bool includeAuth = true}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
     if (includeAuth && _token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
@@ -65,10 +63,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse('$baseUrl/api/Auth/login'),
       headers: _getHeaders(includeAuth: false),
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-      }),
+      body: jsonEncode({'email': email, 'password': password}),
     );
 
     if (_isOk(response.statusCode)) {
@@ -93,11 +88,14 @@ class ApiService {
     if (precioMax != null) queryParams['precioMax'] = precioMax.toString();
     if (query != null) queryParams['q'] = query;
 
-    final uri = Uri.parse('$baseUrl/api/Catalog/products')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/api/Catalog/products',
+    ).replace(queryParameters: queryParams);
 
-    final response =
-        await http.get(uri, headers: _getHeaders(includeAuth: false));
+    final response = await http.get(
+      uri,
+      headers: _getHeaders(includeAuth: false),
+    );
 
     if (_isOk(response.statusCode)) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -234,11 +232,17 @@ class ApiService {
     }
   }
 
-  Future<List<Order>> getMyOrders() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/pedidos/mios'),
-      headers: _getHeaders(),
-    );
+  // services/api_service.dart
+  Future<List<Order>> getMyOrders({int? empresaId, OrderStatus? status}) async {
+    final queryParams = <String, String>{};
+    if (empresaId != null) queryParams['empresaId'] = empresaId.toString();
+    if (status != null) queryParams['status'] = status.value.toString(); // 0..3
+
+    final uri = Uri.parse(
+      '$baseUrl/api/pedidos/mios',
+    ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+
+    final response = await http.get(uri, headers: _getHeaders());
 
     if (_isOk(response.statusCode)) {
       final List<dynamic> data = jsonDecode(response.body);

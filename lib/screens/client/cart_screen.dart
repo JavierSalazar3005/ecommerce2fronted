@@ -6,17 +6,16 @@ import '../../models/order.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
-
   Future<void> _checkout(BuildContext context) async {
     final cartProvider = context.read<CartProvider>();
     final orderProvider = context.read<OrderProvider>();
-    
+
     final itemsByEmpresa = cartProvider.getItemsGroupedByEmpresa();
-    
+
     if (itemsByEmpresa.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El carrito está vacío')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('El carrito está vacío')));
       return;
     }
 
@@ -24,22 +23,28 @@ class CartScreen extends StatelessWidget {
       for (var entry in itemsByEmpresa.entries) {
         final empresaId = entry.key;
         final items = entry.value;
-        
+
         final orderDto = CreateOrderDto(
           empresaId: empresaId,
           items: items
-              .map((item) => CreateOrderItemDto(
-                    productId: item.product.id,
-                    quantity: item.quantity,
-                  ))
+              .map(
+                (item) => CreateOrderItemDto(
+                  productId: item.product.id,
+                  quantity: item.quantity,
+                ),
+              )
               .toList(),
         );
-        
-        await orderProvider.createOrder(orderDto);
+
+        // Limpia sólo lo enviado de esta empresa (oculta el problema CORS si la respuesta es bloqueada)
+        await orderProvider.createOrder(
+          orderDto,
+          onSuccess: () {
+            cartProvider.clearByEmpresa(empresaId);
+          },
+        );
       }
-      
-      cartProvider.clear();
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -150,7 +155,9 @@ class CartScreen extends StatelessWidget {
                                               );
                                             }
                                           },
-                                          icon: const Icon(Icons.remove_circle_outline),
+                                          icon: const Icon(
+                                            Icons.remove_circle_outline,
+                                          ),
                                           iconSize: 20,
                                         ),
                                         Text(
@@ -162,14 +169,17 @@ class CartScreen extends StatelessWidget {
                                         ),
                                         IconButton(
                                           onPressed: () {
-                                            if (item.quantity < item.product.stock) {
+                                            if (item.quantity <
+                                                item.product.stock) {
                                               cartProvider.updateQuantity(
                                                 item.product.id,
                                                 item.quantity + 1,
                                               );
                                             }
                                           },
-                                          icon: const Icon(Icons.add_circle_outline),
+                                          icon: const Icon(
+                                            Icons.add_circle_outline,
+                                          ),
                                           iconSize: 20,
                                         ),
                                       ],
@@ -184,7 +194,10 @@ class CartScreen extends StatelessWidget {
                                     onPressed: () {
                                       cartProvider.removeItem(item.product.id);
                                     },
-                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
                                   ),
                                   Text(
                                     '\$${item.subtotal.toStringAsFixed(2)}',
