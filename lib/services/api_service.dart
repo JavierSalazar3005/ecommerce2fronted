@@ -302,7 +302,7 @@ class ApiService {
     }
   }
 
-  // REVIEWS ENDPOINTS
+    // REVIEWS ENDPOINTS
   Future<List<Review>> getProductReviews(int productId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/productos/$productId/reseñas'),
@@ -319,19 +319,20 @@ class ApiService {
     }
   }
 
-  Future<Review> createReview(int productId, CreateReviewDto review) async {
+  /// ✅ Crea una reseña de producto
+  /// Devuelve `true` si se crea con éxito, `false` si no.
+  Future<bool> createReview(int productId, CreateReviewDto review) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/productos/$productId/reseñas'),
       headers: _getHeaders(),
       body: jsonEncode(review.toJson()),
     );
 
-    if (_isOk(response.statusCode)) {
-      return Review.fromJson(jsonDecode(response.body));
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return true;
     } else {
-      throw Exception(
-        'Error al crear reseña (${response.statusCode}): ${response.body}',
-      );
+      print('❌ Error al crear reseña: ${response.statusCode} - ${response.body}');
+      return false;
     }
-  }
-}
+    }
+    }

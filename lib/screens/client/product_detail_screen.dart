@@ -4,7 +4,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../models/product.dart';
-import '../../models/review.dart';
+import 'package:javier/models/review.dart';
 import '../../services/api_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -22,6 +22,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isLoading = true;
   int _quantity = 1;
 
+  // 👇 NUEVAS VARIABLES PARA RESEÑA
+  final TextEditingController _commentController = TextEditingController();
+  int _selectedRating = 0;
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +38,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final apiService = ApiService();
       final product = await apiService.getProductById(widget.productId);
       final reviews = await apiService.getProductReviews(widget.productId);
-      
+
       setState(() {
         _product = product;
         _reviews = reviews;
@@ -51,13 +55,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() {
-    if (_product != null && _quantity <= _product!.stock) {
+    if (_product != null && _product!.stock > 0 && _quantity <= _product!.stock) {
       context.read<CartProvider>().addItem(_product!, _quantity);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Producto agregado al carrito'),
           duration: Duration(seconds: 2),
         ),
+      );
+    }
+  }
+
+  // 👇 FUNCIÓN PARA ENVIAR RESEÑA
+  Future<void> _submitReview() async {
+    if (_selectedRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una calificación.')),
+      );
+      return;
+    }
+
+    try {
+      final apiService = ApiService();
+      final dto = CreateReviewDto(
+  rating: _selectedRating,
+  comment: _commentController.text.trim().isEmpty
+      ? null
+      : _commentController.text.trim(),
+);
+
+final success = await apiService.createReview(widget.productId, dto);
+
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reseña enviada con éxito ✅')),
+        );
+        _commentController.clear();
+        setState(() => _selectedRating = 0);
+        _loadProduct(); // recargar reseñas
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al enviar reseña ❌')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
@@ -110,7 +154,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            if (_product!.avgRating != null)
+                            if ((_product!.avgRating ?? 0) > 0)
                               Row(
                                 children: [
                                   RatingBarIndicator(
@@ -134,7 +178,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               'Stock disponible: ${_product!.stock}',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: _product!.stock > 0 ? Colors.green : Colors.red,
+                                color: _product!.stock > 0
+                                    ? Colors.green
+                                    : Colors.red,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -223,13 +269,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     child: Padding(
                                       padding: const EdgeInsets.all(12.0),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             children: [
                                               RatingBarIndicator(
-                                                rating: review.rating.toDouble(),
-                                                itemBuilder: (context, index) => const Icon(
+                                                rating: (review.rating ?? 0)
+                                                    .toDouble(),
+                                                itemBuilder: (context, index) =>
+                                                    const Icon(
                                                   Icons.star,
                                                   color: Colors.amber,
                                                 ),
@@ -238,7 +287,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                review.createdAt.toString().substring(0, 10),
+                                                review.createdAt != null
+                                                    ? review.createdAt
+                                                        .toLocal()
+                                                        .toString()
+                                                        .split(' ')[0]
+                                                    : 'Fecha desconocida',
                                                 style: TextStyle(
                                                   color: Colors.grey[600],
                                                   fontSize: 12,
@@ -254,6 +308,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ),
                                     ),
                                   )),
+                            const SizedBox(height: 24),
+                            const Divider(),
+                            const Text(
+                              'Deja tu reseña',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            RatingBar.builder(
+                              initialRating: 0,
+                              minRating: 1,
+                              direction: Axis.horizontal,
+                              allowHalfRating: false,
+                              itemCount: 5,
+                              itemPadding:
+                                  const EdgeInsets.symmetric(horizontal: 4.0),
+                              itemBuilder: (context, _) => const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                              ),
+                              onRatingUpdate: (rating) {
+                                setState(() {
+                                  _selectedRating = rating.toInt();
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _commentController,
+                              decoration: const InputDecoration(
+                                hintText: 'Escribe un comentario (opcional)',
+                                border: OutlineInputBorder(),
+                              ),
+                              maxLines: 2,
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _submitReview,
+                              icon: const Icon(Icons.send),
+                              label: const Text('Enviar reseña'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                           ],
                         ),
                       ),
